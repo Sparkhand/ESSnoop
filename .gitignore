@@ -1,0 +1,6 @@
+/analyzed
+/bytecode
+/quicktest_analyzed
+/quicktest_bytecode
+__pycache__
+*.csv
