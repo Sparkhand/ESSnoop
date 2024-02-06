@@ -10,6 +10,7 @@ from enum import Enum
 # Logger
 log = Logger.get_logger(__name__)
 
+
 # An enum to classify a single opcode
 class NodeType(Enum):
     JUMP = 1
@@ -20,6 +21,7 @@ class NodeType(Enum):
 
 class Analyzer:
     # Constructor. Class has instance variables:
+    # |- contract_address: The address of the contract
     # |- cfg: The runtimeCfg object
     # |- blocks: The nodes (blocks) of the CFG
     # |- edges: The edges of the CFG
@@ -27,6 +29,7 @@ class Analyzer:
     def __init__(self, filename: str):
         with open(filename, "r") as file:
             data = json.load(file)
+        self.__contract_address = filename.split("/")[-1].split(".")[0]
         self.__cfg = data["runtimeCfg"]
         self.__blocks = self.__cfg["nodes"]
         self.__edges = self.__cfg["successors"]
@@ -71,16 +74,15 @@ class Analyzer:
             raise Exception(
                 f"Block with offset {block['offset']} has less than 2 opcodes"
             )
-            
+
         if len(parsedOps) < 3:  # It means there is only one opcode
             first = self.__get_op_type(parsedOps[0])
             return tuple((first, first))
-        
+
         return tuple(
             (self.__get_op_type(parsedOps[0]), self.__get_op_type(parsedOps[-2]))
         )
 
     # Analyze the graph and produce a report
     def analyze(self) -> dict:
-        log.info("It works! For now...")
-        print("It works! For now...")
+        log.info(f"Hey, I'm {self.__contract_address} and everything works! For now...")

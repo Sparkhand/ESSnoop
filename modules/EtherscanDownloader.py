@@ -1,6 +1,6 @@
 ###########################################################
 # Python module to download runtime bytecode from Etherscan API using API key.
-# Make a request to Etherscan API to get the runtime bytecode of a contract
+# Makes a request to Etherscan API to get the runtime bytecode of a contract
 # using the contract's address. The API key is required to make the request.
 ###########################################################
 

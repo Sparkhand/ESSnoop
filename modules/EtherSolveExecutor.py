@@ -1,5 +1,5 @@
 ###########################################################
-# Python to run EtherSolve.jar given the file containing the bytecode
+# Python module to run EtherSolve.jar given the file containing the bytecode
 # of the contract and the output directory.
 ###########################################################
 

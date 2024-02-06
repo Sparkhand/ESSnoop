@@ -14,9 +14,11 @@ class NodeType(Enum):
     JUMPDEST = 3
     OTHER = 4
 
+
 ###########################################################
 # UNREACHABLE JUMP or JUMPI
 ###########################################################
+
 
 # Unreachable JUMP or JUMPI => The block contains a JUMP or JUMPI but there
 # are no edges entering the block.
@@ -24,12 +26,13 @@ def is_unreachable(edges: list, start_block_id: str) -> bool:
     # If the block is the first block, it is reachable
     if start_block_id == "0":
         return False
-    
+
     # If there are no edges entering the block, it is unreachable
     for edge in edges:
         if edge.get_destination() == start_block_id:
             return False
     return True
+
 
 ###########################################################
 # SOLVED JUMP
@@ -90,7 +93,7 @@ def is_soundly_solved_jumpi(dests: list, blocks: dict) -> bool:
     for dest in dests:
         if blocks[dest]["start"]["type"] == NodeType.JUMPDEST:
             return True
-        
+
     return False
 
 
@@ -195,7 +198,7 @@ def analyze(filename: str) -> dict:
                 metrics["total_jumps"] += 1
                 # Check if the JUMP is precisely or soundly solved, or unreachable
                 dests = get_dests(edges, block["start"]["id"])
-                
+
                 if is_unreachable(edges, block["start"]["id"]):
                     metrics["unreachable_jumps"] += 1
                 elif is_precisely_solved_jump(dests, blocks):
@@ -208,7 +211,7 @@ def analyze(filename: str) -> dict:
                 metrics["total_jumps"] += 1
                 # Check if the JUMPI is precisely or soundly solved, or unreachable
                 dests = get_dests(edges, block["start"]["id"])
-                
+
                 if is_unreachable(edges, block["start"]["id"]):
                     metrics["unreachable_jumps"] += 1
                 elif is_precisely_solved_jumpi(dests, blocks):
