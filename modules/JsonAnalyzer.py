@@ -85,4 +85,4 @@ class Analyzer:
 
     # Analyze the graph and produce a report
     def analyze(self) -> dict:
-        log.info(f"Hey, I'm {self.__contract_address} and everything works! For now...")
+        return {}

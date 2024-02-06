@@ -39,6 +39,7 @@ contracts_input_file = "input_contracts"
 bytecode_output_dir = "bytecode"
 opcodes_output_dir = "opcodes"
 json_output_dir = "analyzed"
+report_file = "report.csv"
 
 # Clear the log file
 with open("logs.txt", "w"):
@@ -184,8 +185,20 @@ if ended_with_error:
     printError(f"Contracts involved in errors: {involved_in_error}")
 
 ###########################################################
-# Analyze the JSON files and produce a report (.csv file)
+# Analyze the JSON files and retrieve stats, then add them to a Pandas DataFrame
+# and finally write the DataFrame to a .csv file
 ###########################################################
+
+dataframe = pd.DataFrame(
+    columns=[
+        "contract",
+        "total_jumps",
+        "precisely_solved_jumps",
+        "soundly_solved_jumps",
+        "unreachable_jumps",
+        "unsolved_jumps",
+    ]
+)
 
 pbar = FillingCirclesBar(
     "Analyzing JSON files",
@@ -198,15 +211,44 @@ involved_in_error = []
 
 for file in os.listdir(json_output_dir):
     if file.endswith(".json"):
+        # First, retrieve the total number of JUMP and JUMPI statements from
+        # the .opcodes file
+        opcodes_file = os.path.join(opcodes_output_dir, file.split(".")[0] + ".opcodes")
+        if not os.path.exists(opcodes_file):
+            log.error(f"Opcodes file {opcodes_file} not found")
+            continue
+        total_jumps = get_total_jumps(opcodes_file)
+
+        # Then, analyze the JSON file
+        json_stats = {}
+
         analyzer = JsonAnalyzer.Analyzer(os.path.join(json_output_dir, file))
         try:
-            analyzer.analyze()
+            json_stats = analyzer.analyze()
         except Exception as e:
             log.error(str(e))
             ended_with_error = True
             involved_in_error.append(os.path.basename(file).split(".")[0])
+            continue
+
+        # Add the stats to the DataFrame
+        dataframe = pd.concat(
+            [
+                dataframe,
+                pd.DataFrame(
+                    [
+                        {
+                            "contract": os.path.basename(file).split(".")[0],
+                            "total_jumps": total_jumps,
+                            **json_stats,
+                        }
+                    ]
+                ),
+            ]
+        )
 
         pbar.next()
+
 pbar.finish()
 
 # Check for errors
@@ -214,18 +256,12 @@ if ended_with_error:
     printError("Errors occurred during JSON analysis, check the logs for more info")
     printError(f"Contracts involved in errors: {involved_in_error}")
 
-"""
-# Create a Pandas DataFrame to store the report
-df = pd.DataFrame(
-    columns=[
-        "contract",
-        "total_jumps",
-        "precisely_solved_jumps",
-        "soundly_solved_jumps",
-        "unreachable_jumps",
-    ]
-)
+# Write the DataFrame to a .csv file
+print(f"Writing report to {report_file}... ", end="")
+dataframe.to_csv(report_file, index=False)
+print("Done!")
 
+"""
 for file in os.listdir(json_output_dir):
     metrics = {
         "total_jumps": -1,
@@ -256,8 +292,4 @@ for file in os.listdir(json_output_dir):
         df = pd.concat(
             [df, pd.DataFrame([{"contract": file.split(".")[0], **metrics, "solved_percentage": solved_percentage}])]
         )
-
-# Write to a .csv file
-report_file = "quicktest_report.csv"
-df.to_csv(report_file, index=False)
 """
