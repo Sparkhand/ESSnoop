@@ -42,7 +42,7 @@ class Analyzer:
         for block in self.__blocks:
             if block["offset"] == offset:
                 return block
-        raise Exception(f"!!## Block with offset {offset} not found")
+        raise Exception(f"Block with offset {offset} not found")
 
     # Given a block, it returns its destinations
     def __get_dests(self, block: dict) -> list:
@@ -69,11 +69,13 @@ class Analyzer:
         parsedOps = parsedOps.split("\n")
         if len(parsedOps) < 2:  # Invalid block (no opcodes)
             raise Exception(
-                f"!!## Block with offset {block['offset']} has less than 2 opcodes"
+                f"Block with offset {block['offset']} has less than 2 opcodes"
             )
+            
         if len(parsedOps) < 3:  # It means there is only one opcode
             first = self.__get_op_type(parsedOps[0])
             return tuple((first, first))
+        
         return tuple(
             (self.__get_op_type(parsedOps[0]), self.__get_op_type(parsedOps[-2]))
         )

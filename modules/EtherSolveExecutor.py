@@ -13,14 +13,10 @@ log = Logger.get_logger(__name__)
 
 # Run EtherSolve.jar
 def run(bytecode_file: str, output_dir: str):
-    # Check if the output dir exists
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
     # Extract filename without extension and parent directory
     result_filename = os.path.basename(bytecode_file).split(".")[0]
 
-    log.info(f"Launching EtherSolve analysis for {bytecode_file}")
+    log.info(f"Launching EtherSolve analysis for {result_filename}")
 
     # Run EtherSolve.jar
     command = [
@@ -34,12 +30,16 @@ def run(bytecode_file: str, output_dir: str):
     ]
     proc = Popen(command, stdout=PIPE, stderr=PIPE)
     proc.wait()
-    
-    # Check if the .json file has been created
-    if not os.path.exists(f"{output_dir}/{result_filename}.json"):
-        log.error(
-            f"Error in running EtherSolve for {bytecode_file}, reason:\n {proc.stderr.read().decode('utf-8')}"
+
+    # Log stdout if not empty
+    if proc.stdout.read().decode("utf-8"):
+        log.info(proc.stdout.read().decode("utf-8"))
+
+    # Log stderr if the process failed
+    if proc.returncode != 0:
+        raise Exception(
+            f"Error in running EtherSolve for {result_filename}, reason:\n {proc.stderr.read().decode('utf-8')}"
         )
-        raise Exception()
-    else:
-        log.info(f"Analysis for {bytecode_file} completed successfully")
+
+    # Log success
+    log.info(f"Analysis for {result_filename} completed successfully")

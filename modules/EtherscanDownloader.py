@@ -5,7 +5,6 @@
 ###########################################################
 
 import requests
-import time
 import os
 import modules.Logger as Logger
 
@@ -44,26 +43,3 @@ def download_bytecode(output_dir: str, contract_address: str, api_key: str):
     with open(os.path.join(output_dir, filename), "w") as file:
         file.write(result)
         log.info(f"Successfully downloaded bytecode for contract {contract_address}")
-
-
-# Download bytecode for a list of contracts (addresses in a file)
-def batch_download_bytecode(input_file: str, output_dir: str, api_key: str):
-    # Check if the output dir exists
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    # For each line in the input file, download the bytecode of the contract
-    with open(input_file, "r") as file:
-        count = 0
-        for line in file:
-            contract_address = line.strip()
-
-            try:
-                download_bytecode(output_dir, contract_address, api_key)
-            except Exception as e:
-                log.error(str(e))
-
-            # Pause every 5 requests to avoid rate limiting
-            count += 1
-            if count % 5 == 0:
-                time.sleep(0.005)
