@@ -35,11 +35,10 @@ def run(bytecode_file: str, output_dir: str):
     if proc.stdout.read().decode("utf-8"):
         log.info(proc.stdout.read().decode("utf-8"))
 
-    # Log stderr if the process failed
+    # Raise exception with stderr if the process failed
     if proc.returncode != 0:
-        raise Exception(
-            f"Error in running EtherSolve for {result_filename}, reason:\n {proc.stderr.read().decode('utf-8')}"
-        )
+        log.error(f"Error in running EtherSolve for {result_filename}, reason:\n {proc.stderr.read().decode('utf-8')}")
+        raise Exception()
 
     # Log success
     log.info(f"Analysis for {result_filename} completed successfully")

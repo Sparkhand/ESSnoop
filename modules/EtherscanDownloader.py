@@ -34,9 +34,8 @@ def download_bytecode(output_dir: str, contract_address: str, api_key: str):
 
     # Error handling
     if "error" in result.lower():
-        raise Exception(
-            f"[{result}] error in downloading bytecode for contract {contract_address}"
-        )
+        log.error(f"[{result}] error in downloading bytecode for contract {contract_address}")
+        raise Exception()
 
     # Save the bytecode to a file
     filename = f"{contract_address}.bytecode"

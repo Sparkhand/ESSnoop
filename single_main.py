@@ -19,6 +19,11 @@ def printError(msg):
     print(f"\033[2;31;43m {msg} \033[0;0m")
 
 
+def printContractsInvolvedInErrors(contracts: list):
+    for contract in contracts:
+        printError(f"|- {contract}")
+
+
 # Utility function to get the total number of JUMP AND JUMPI statements
 def get_total_jumps(filename: str) -> int:
     count = 0
@@ -111,7 +116,8 @@ if ended_with_error:
     printError(
         "Errors occurred during bytecode downloading, check the logs for more info"
     )
-    printError(f"!# Contracts involved in errors: {involved_in_error}")
+    printError(f"Contracts involved in errors:")
+    printContractsInvolvedInErrors(involved_in_error)
 
 ###########################################################
 # Parse the bytecode and extract opcodes
@@ -136,8 +142,7 @@ for file in os.listdir(bytecode_output_dir):
         bytecode_file = os.path.join(bytecode_output_dir, file)
         try:
             BytecodeParser.parseBytecode(bytecode_file, opcodes_output_dir)
-        except Exception as e:
-            log.error(str(e))
+        except Exception:
             ended_with_error = True
             involved_in_error.append(os.path.basename(bytecode_file).split(".")[0])
         pbar.next()
@@ -146,7 +151,8 @@ pbar.finish()
 # Check for errors
 if ended_with_error:
     printError("Errors occurred during bytecode parsing, check the logs for more info")
-    printError(f"Contracts involved in errors: {involved_in_error}")
+    printError(f"Contracts involved in errors:")
+    printContractsInvolvedInErrors(involved_in_error)
 
 ###########################################################
 # Compute the JSON files for each contract via EtherSolve
@@ -170,8 +176,7 @@ for file in os.listdir(bytecode_output_dir):
         bytecode_file = os.path.join(bytecode_output_dir, file)
         try:
             EtherSolve.run(bytecode_file, json_output_dir)
-        except Exception as e:
-            log.error(str(e))
+        except Exception:
             ended_with_error = True
             involved_in_error.append(os.path.basename(bytecode_file).split(".")[0])
         pbar.next()
@@ -182,11 +187,11 @@ if ended_with_error:
     printError(
         "Errors occurred during EtherSolve analysis, check the logs for more info"
     )
-    printError(f"Contracts involved in errors: {involved_in_error}")
+    printError(f"Contracts involved in errors:")
+    printContractsInvolvedInErrors(involved_in_error)
 
 ###########################################################
 # Analyze the JSON files and retrieve stats, then add them to a Pandas DataFrame
-# and finally write the DataFrame to a .csv file
 ###########################################################
 
 dataframe = pd.DataFrame(
@@ -197,6 +202,7 @@ dataframe = pd.DataFrame(
         "soundly_solved_jumps",
         "unreachable_jumps",
         "unsolved_jumps",
+        "solved_percentage",
     ]
 )
 
@@ -221,31 +227,68 @@ for file in os.listdir(json_output_dir):
 
         # Then, analyze the JSON file
         json_stats = {}
+        unsolved_jumps = 0  # Total - Precisely - Soundly - Unreachable
 
         analyzer = JsonAnalyzer.Analyzer(os.path.join(json_output_dir, file))
         try:
             json_stats = analyzer.analyze()
-        except Exception as e:
-            log.error(str(e))
+        except Exception:
             ended_with_error = True
             involved_in_error.append(os.path.basename(file).split(".")[0])
             continue
+        finally:
+            del analyzer  # Free resources
+
+        # Compute additional stats:
+        # |- unsolved_jumps = total_jumps - precisely_solved_jumps - soundly_solved_jumps - unreachable_jumps
+        # |- solved_percentage = (precisely_solved_jumps + soundly_solved_jumps) / (total_jumps - unreachable_jumps)
+
+        unsolved_jumps = (
+            total_jumps
+            - json_stats["precisely_solved_jumps"]
+            - json_stats["soundly_solved_jumps"]
+            - json_stats["unreachable_jumps"]
+        )
+
+        solved_percentage = -1
+        try:
+            solved_percentage = (
+                json_stats["precisely_solved_jumps"]
+                + json_stats["soundly_solved_jumps"]
+            ) / (total_jumps - json_stats["unreachable_jumps"])
+        except ZeroDivisionError:
+            solved_percentage = -1
 
         # Add the stats to the DataFrame
-        dataframe = pd.concat(
-            [
-                dataframe,
-                pd.DataFrame(
-                    [
-                        {
-                            "contract": os.path.basename(file).split(".")[0],
-                            "total_jumps": total_jumps,
-                            **json_stats,
-                        }
-                    ]
-                ),
-            ]
-        )
+        if dataframe.empty:
+            dataframe = pd.DataFrame(
+                [
+                    {
+                        "contract": file.split(".")[0],
+                        "total_jumps": total_jumps,
+                        **json_stats,
+                        "unsolved_jumps": unsolved_jumps,
+                        "solved_percentage": solved_percentage,
+                    }
+                ]
+            )
+        else:
+            dataframe = pd.concat(
+                [
+                    dataframe,
+                    pd.DataFrame(
+                        [
+                            {
+                                "contract": file.split(".")[0],
+                                "total_jumps": total_jumps,
+                                **json_stats,
+                                "unsolved_jumps": unsolved_jumps,
+                                "solved_percentage": solved_percentage,
+                            }
+                        ]
+                    ),
+                ]
+            )
 
         pbar.next()
 
@@ -254,42 +297,33 @@ pbar.finish()
 # Check for errors
 if ended_with_error:
     printError("Errors occurred during JSON analysis, check the logs for more info")
-    printError(f"Contracts involved in errors: {involved_in_error}")
+    printError(f"Contracts involved in errors:")
+    printContractsInvolvedInErrors(involved_in_error)
+
+###########################################################
+# Write the DataFrame to a .csv file, and analyze the data with Pandas
+###########################################################
 
 # Write the DataFrame to a .csv file
 print(f"Writing report to {report_file}... ", end="")
 dataframe.to_csv(report_file, index=False)
 print("Done!")
 
-"""
-for file in os.listdir(json_output_dir):
-    metrics = {
-        "total_jumps": -1,
-        "precisely_solved_jumps": -1,
-        "soundly_solved_jumps": -1,
-        "unreachable_jumps": -1,
-    }
-    if file.endswith(".dot"):
-        dot_file = os.path.join(json_output_dir, file)
-        try:
-            print(f"Analyzing graph of {file}")
-            metrics = DotAnalyzer.analyze(dot_file)
-        except Exception as e:
-            print(e)
+# Analyze the data with Pandas and get some stats
 
-        # Calculate solved_percentage as:
-        # (precisely_solved_jumps + soundly_solved_jumps) / (total_jumps - unreachable_jumps)
-        try:
-            solved_percentage = (
-                metrics["precisely_solved_jumps"] + metrics["soundly_solved_jumps"]
-            ) / (metrics["total_jumps"] - metrics["unreachable_jumps"])
-        except ZeroDivisionError:
-            solved_percentage = -1
+# Total number of contracts (final)
+total_contracts = dataframe.shape[0]
 
-        if solved_percentage < 0:
-            solved_percentage = -1
+# Mean of percentage of solved jumps
+mean_solved_percentage = dataframe["solved_percentage"].mean()
 
-        df = pd.concat(
-            [df, pd.DataFrame([{"contract": file.split(".")[0], **metrics, "solved_percentage": solved_percentage}])]
-        )
-"""
+# Print the stats
+log.info(f"Total number of contracts: {total_contracts}")
+log.info(f"Mean of percentage of solved jumps: {mean_solved_percentage}")
+
+print()
+print("#" * 50)
+print("REPORT:")
+print(f"Total number of contracts: {total_contracts}")
+print(f"Mean of percentage of solved jumps: {mean_solved_percentage}")
+print("#" * 50)
