@@ -1,16 +1,34 @@
+import os
+import time
+import pandas as pd
+from progress.bar import FillingCirclesBar
+
 import modules.Logger as Logger
 import modules.EtherscanDownloader as Downloader
+import modules.BytecodeParser as BytecodeParser
 import modules.EtherSolveExecutor as EtherSolve
 import modules.JsonAnalyzer as JsonAnalyzer
-import pandas as pd
-import time
-import os
-from progress.bar import FillingCirclesBar
+
+###########################################################
+# Utility functions
+###########################################################
 
 
 # Utility function to print an error message
 def printError(msg):
     print(f"\033[2;31;43m {msg} \033[0;0m")
+
+
+# Utility function to get the total number of JUMP AND JUMPI statements
+def get_total_jumps(filename: str) -> int:
+    count = 0
+    with open(filename, "r") as file:
+        # For each line in the file, check if it contains a JUMP or JUMPI statement
+        for line in file:
+            line = line.strip()
+            if line == "JUMP" or line == "JUMPI":
+                count += 1
+    return count
 
 
 ###########################################################
@@ -19,6 +37,7 @@ def printError(msg):
 
 contracts_input_file = "input_contracts"
 bytecode_output_dir = "bytecode"
+opcodes_output_dir = "opcodes"
 json_output_dir = "analyzed"
 
 # Clear the log file
@@ -92,6 +111,41 @@ if ended_with_error:
         "Errors occurred during bytecode downloading, check the logs for more info"
     )
     printError(f"!# Contracts involved in errors: {involved_in_error}")
+
+###########################################################
+# Parse the bytecode and extract opcodes
+###########################################################
+
+# Check if the output dir exists
+if not os.path.exists(opcodes_output_dir):
+    os.makedirs(opcodes_output_dir)
+
+total_to_parse = len(os.listdir(bytecode_output_dir))
+pbar = FillingCirclesBar(
+    "Parsing bytecode",
+    max=total_to_parse,
+    suffix="%(percent)d%% [%(index)d / %(max)d]",
+)
+
+ended_with_error = False
+involved_in_error = []
+
+for file in os.listdir(bytecode_output_dir):
+    if file.endswith(".bytecode"):
+        bytecode_file = os.path.join(bytecode_output_dir, file)
+        try:
+            BytecodeParser.parseBytecode(bytecode_file, opcodes_output_dir)
+        except Exception as e:
+            log.error(str(e))
+            ended_with_error = True
+            involved_in_error.append(os.path.basename(bytecode_file).split(".")[0])
+        pbar.next()
+pbar.finish()
+
+# Check for errors
+if ended_with_error:
+    printError("Errors occurred during bytecode parsing, check the logs for more info")
+    printError(f"Contracts involved in errors: {involved_in_error}")
 
 ###########################################################
 # Compute the JSON files for each contract via EtherSolve

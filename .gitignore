@@ -1,7 +1,7 @@
 /analyzed
 /bytecode
-/quicktest_analyzed
-/quicktest_bytecode
+/opcodes
+/quicktest_*
 __pycache__
 *.csv
 *.txt
