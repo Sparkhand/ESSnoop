@@ -1,3 +1,4 @@
+import modules.Logger as Logger
 import modules.EtherscanDownloader as Downloader
 import modules.EtherSolveExecutor as EtherSolve
 import modules.DotAnalyzer as DotAnalyzer
@@ -8,27 +9,37 @@ import os
 # API key and preliminary setup
 ###########################################################
 
+# Clear the log file
+with open('logs.txt', 'w'):
+    pass
+# Create a logger
+log = Logger.get_logger(__name__)
+
 # Retrieve EthersScan API key
 api_key = os.getenv("ETHERSCAN_API_KEY")
 
 # Check if EtherScan API key is set
 if api_key is None:
     print("ERROR! EtherScan API key (ETHERSCAN_API_KEY) is not set")
+    log.error("EtherScan API key (ETHERSCAN_API_KEY) is not set")
     exit(1)
 
 # Check if EtherSolve.jar is in the current directory
 if not os.path.exists("EtherSolve.jar"):
     print("ERROR! EtherSolve.jar not found in the current directory")
+    log.error("EtherSolve.jar not found in the current directory")
     exit(1)
 
 # Check if input_contracts file is in the current directory
 if not os.path.exists("input_contracts"):
     print("ERROR! input_contracts file not found in the current directory")
+    log.error("input_contracts file not found in the current directory")
     exit(1)
 
 ###########################################################
 # Download bytecode of contracts
 ###########################################################
+print("Retrieving bytecode of contracts from Etherscan API")
 
 contracts_input_file = "input_contracts"
 bytecode_output_dir = "bytecode"
@@ -38,22 +49,28 @@ Downloader.batch_download_bytecode(contracts_input_file, bytecode_output_dir, ap
 ###########################################################
 # Compute the .dot files for each contract via EtherSolve
 ###########################################################
+print("Starting EtherSolve analysis for each contract")
 
-dot_output_dir = "analyzed"
+json_output_dir = "analyzed"
 
 for file in os.listdir(bytecode_output_dir):
     if file.endswith(".bytecode"):
         bytecode_file = os.path.join(bytecode_output_dir, file)
         try:
-            EtherSolve.run(bytecode_file, dot_output_dir)
-            print(f"Succesfully computed .dot file for {file}")
+            EtherSolve.run(bytecode_file, json_output_dir)
         except Exception as e:
-            print(f"######## {e}")
+            print(f"Error in running EtherSolve for {file}, see logs for details")
 
 ###########################################################
 # Analyze the .dot files and produce a report (.csv file)
 ###########################################################
 
+for file in os.listdir(json_output_dir):
+    if file.endswith(".json"):
+        analyzer = JsonAnalyzer.Analyzer(os.path.join(json_output_dir, file))
+        analyzer.analyze()
+
+'''
 # Create a Pandas DataFrame to store the report
 df = pd.DataFrame(
     columns=[
@@ -62,11 +79,10 @@ df = pd.DataFrame(
         "precisely_solved_jumps",
         "soundly_solved_jumps",
         "unreachable_jumps",
-        "solved_percentage",
     ]
 )
 
-for file in os.listdir(dot_output_dir):
+for file in os.listdir(json_output_dir):
     metrics = {
         "total_jumps": -1,
         "precisely_solved_jumps": -1,
@@ -74,7 +90,7 @@ for file in os.listdir(dot_output_dir):
         "unreachable_jumps": -1,
     }
     if file.endswith(".dot"):
-        dot_file = os.path.join(dot_output_dir, file)
+        dot_file = os.path.join(json_output_dir, file)
         try:
             print(f"Analyzing graph of {file}")
             metrics = DotAnalyzer.analyze(dot_file)
@@ -98,5 +114,6 @@ for file in os.listdir(dot_output_dir):
         )
 
 # Write to a .csv file
-report_file = "ethersolve_report.csv"
+report_file = "quicktest_report.csv"
 df.to_csv(report_file, index=False)
+'''

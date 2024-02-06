@@ -4,3 +4,4 @@
 /quicktest_bytecode
 __pycache__
 *.csv
+*.txt
