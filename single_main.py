@@ -81,10 +81,10 @@ if not os.path.exists(contracts_input_file):
 if not os.path.exists(bytecode_output_dir):
     os.makedirs(bytecode_output_dir)
 
-total_lines = sum(1 for line in open(contracts_input_file))
+total_input_contracts = sum(1 for line in open(contracts_input_file))
 pbar = FillingCirclesBar(
     "Downloading bytecode",
-    max=total_lines,
+    max=total_input_contracts,
     suffix="%(percent)d%% [%(index)d / %(max)d]",
 )
 
@@ -324,6 +324,7 @@ log.info(f"Mean of percentage of solved jumps: {mean_solved_percentage}")
 print()
 print("#" * 50)
 print("REPORT:")
-print(f"Total number of contracts: {total_contracts}")
+print(f"Input had {total_input_contracts} contracts")
+print(f"Total number of contracts (final): {total_contracts}")
 print(f"Mean of percentage of solved jumps: {mean_solved_percentage}")
 print("#" * 50)

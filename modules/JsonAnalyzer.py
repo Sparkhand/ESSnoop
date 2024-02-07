@@ -40,9 +40,7 @@ class Analyzer:
         }
 
     # Given a block offset, it returns the block
-    def __get_block(self, offset: int or str) -> dict:
-        offset = int(offset)
-
+    def __get_block(self, offset: int) -> dict:
         for block in self.__blocks:
             if block["offset"] == offset:
                 return block
@@ -50,10 +48,17 @@ class Analyzer:
         raise Exception(f"Block with offset {offset} not found")
 
     # Given a block, it returns its destinations
-    def __get_dests(self, block: dict) -> list:
+    def __get_dests_from_block(self, block: dict) -> list:
         block_offset = block["offset"]
         for edge in self.__edges:
             if edge["from"] == block_offset:
+                return edge["to"]
+        return []
+    
+    # Given a block offset, it returns its destinations
+    def __get_dests_from_offset(self, offset: int) -> list:
+        for edge in self.__edges:
+            if edge["from"] == offset:
                 return edge["to"]
         return []
 
@@ -97,7 +102,7 @@ class Analyzer:
     # |- a JUMPDEST
     # |- a non-JUMPDEST
     def __is_precisely_solved(self, jump: NodeType, block: dict) -> bool:
-        dests = self.__get_dests(block)
+        dests = self.__get_dests_from_block(block)
 
         if jump == NodeType.JUMP:
             if len(dests) != 1:
@@ -143,7 +148,7 @@ class Analyzer:
     # A JUMPI is soundly solved if it has a JUMPDEST as one of its destinations
     # and one of the other destinations is a non-JUMPDEST
     def __is_soundly_solved(self, jump: NodeType, block: dict) -> bool:
-        dests = self.__get_dests(block)
+        dests = self.__get_dests_from_block(block)
 
         if jump == NodeType.JUMP:
             if len(dests) < 1:
@@ -185,10 +190,27 @@ class Analyzer:
     # False otherwise.
     # A JUMP or a JUMPI is unreachable if, starting from the entry point of the
     # CFG (block with offset 0) there is no path to the block containing the jump.
-    def __is_unreachable(
-        self, jump: NodeType, block: dict, entrypoint: str = "0"
-    ) -> bool:
-        return False
+    def __is_unreachable(self, target_offset: int, entrypoint: int = 0) -> bool:
+        visited = set()  # Set to keep track of visited blocks
+        stack = [entrypoint]  # Stack to perform DFS
+
+        # If there is something in the stack, it means there are paths to explore
+        while stack:
+            current_offset = stack.pop()
+            visited.add(current_offset)
+
+            if current_offset == target_offset:
+                return False  # Block is reachable
+
+            # Get the destinations of the current block
+            dests = self.__get_dests_from_offset(current_offset)
+
+            # Append the destinations to the stack if they haven't been visited
+            for dest in dests:
+                if dest not in visited:
+                    stack.append(dest)
+
+        return True  # Block is unreachable
 
     # Analyze the graph and produce a report
     def analyze(self) -> dict:
@@ -224,7 +246,7 @@ class Analyzer:
                         f"ADDRESS: {self.__contract_address} - BLOCK: {block['offset']} - {last} is soundly solved"
                     )
                     self.__metrics["soundly_solved_jumps"] += 1
-                elif self.__is_unreachable(last, block):
+                elif self.__is_unreachable(block["offset"]):
                     log.info(
                         f"ADDRESS: {self.__contract_address} - BLOCK: {block['offset']} - {last} is unreachable"
                     )
