@@ -32,14 +32,16 @@ def parseBytecode(input_file: str, output_dir: str):
     outfile = os.path.join(output_dir, f"{result_filename}.opcodes")
 
     with open(outfile, "w") as file:
-        for i in range(0, len(bytecode), 2):
+        i = 0
+        while i < len(bytecode):
             opcode = bytecode[i : i + 2]
             bytesForVal = pushBytes(opcode)
             if bytesForVal == 0:  # Opcode is not a PUSH (or maybe is a PUSH0)
                 file.write(f"{getOpcodeString(opcode)}\n")
             else:  # Opcode is a PUSH
-                file.write(f"PUSH{bytesForVal} 0x{bytecode[i+2:i+2+bytesForVal]}\n")
-
+                file.write(f"PUSH{bytesForVal} 0x{bytecode[i+2:i+2+bytesForVal*2]}\n")
+                i += bytesForVal * 2
+            i += 2
 
 def getOpcodeString(opcode: str) -> str:
     match opcode:

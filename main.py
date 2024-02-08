@@ -24,6 +24,18 @@ def printContractsInvolvedInErrors(contracts: list):
         printError(f"|- {contract}")
 
 
+# Utility function to get the total number of opcodes
+def get_total_opcodes(filename: str) -> int:
+    count = 0
+    with open(filename, "r") as file:
+        # For each line in the file, check if it contains an opcode
+        for line in file:
+            line = line.strip()
+            if line:
+                count += 1
+    return count
+
+
 # Utility function to get the total number of JUMP AND JUMPI statements
 def get_total_jumps(filename: str) -> int:
     count = 0
@@ -44,7 +56,7 @@ contracts_input_file = "input_contracts"
 bytecode_output_dir = "bytecode"
 opcodes_output_dir = "opcodes"
 json_output_dir = "analyzed"
-report_file = "report.csv"
+report_file = "ethersolve_report.csv"
 
 # Clear the log file
 with open("logs.txt", "w"):
@@ -196,13 +208,14 @@ if ended_with_error:
 
 dataframe = pd.DataFrame(
     columns=[
-        "contract",
-        "total_jumps",
-        "precisely_solved_jumps",
-        "soundly_solved_jumps",
-        "unreachable_jumps",
-        "unsolved_jumps",
-        "solved_percentage",
+        "Smart Contract",
+        "Total Opcodes" "Total Jumps",
+        "Precisely solved Jumps",
+        "Sound solved Jumps",
+        "Unreachable Jumps",
+        "Total solved Jumps",
+        "% Precisely Solved",
+        "% Total Solved",
     ]
 )
 
@@ -223,6 +236,7 @@ for file in os.listdir(json_output_dir):
         if not os.path.exists(opcodes_file):
             log.error(f"Opcodes file {opcodes_file} not found")
             continue
+        total_opcodes = get_total_opcodes(opcodes_file)
         total_jumps = get_total_jumps(opcodes_file)
 
         # Then, analyze the JSON file
@@ -241,34 +255,48 @@ for file in os.listdir(json_output_dir):
 
         # Compute additional stats:
         # |- unsolved_jumps = total_jumps - precisely_solved_jumps - soundly_solved_jumps - unreachable_jumps
-        # |- solved_percentage = (precisely_solved_jumps + soundly_solved_jumps) / (total_jumps - unreachable_jumps)
+        # |- precisely_solved_percentage = precisely_solved_jumps / (total_jumps - unreachable_jumps)
+        # |- total_solved_percentage = (precisely_solved_jumps + soundly_solved_jumps) / (total_jumps - unreachable_jumps)
 
-        unsolved_jumps = (
-            total_jumps
-            - json_stats["precisely_solved_jumps"]
-            - json_stats["soundly_solved_jumps"]
-            - json_stats["unreachable_jumps"]
-        )
+        # unsolved_jumps = (
+        #     total_jumps
+        #     - json_stats["precisely_solved_jumps"]
+        #     - json_stats["soundly_solved_jumps"]
+        #     - json_stats["unreachable_jumps"]
+        # )
 
-        solved_percentage = -1
+        precisely_solved_percentage = -1
         try:
-            solved_percentage = (
+            precisely_solved_percentage = (json_stats["precisely_solved_jumps"]) / (
+                total_jumps - json_stats["unreachable_jumps"]
+            )
+        except ZeroDivisionError:
+            precisely_solved_percentage = -1
+
+        total_solved_percentage = -1
+        try:
+            total_solved_percentage = (
                 json_stats["precisely_solved_jumps"]
                 + json_stats["soundly_solved_jumps"]
             ) / (total_jumps - json_stats["unreachable_jumps"])
         except ZeroDivisionError:
-            solved_percentage = -1
+            total_solved_percentage = -1
 
         # Add the stats to the DataFrame
         if dataframe.empty:
             dataframe = pd.DataFrame(
                 [
                     {
-                        "contract": file.split(".")[0],
-                        "total_jumps": total_jumps,
-                        **json_stats,
-                        "unsolved_jumps": unsolved_jumps,
-                        "solved_percentage": solved_percentage,
+                        "Smart Contract": file.split(".")[0],
+                        "Total Opcodes": total_opcodes,
+                        "Total Jumps": total_jumps,
+                        "Precisely solved Jumps": json_stats["precisely_solved_jumps"],
+                        "Sound solved Jumps": json_stats["soundly_solved_jumps"],
+                        "Unreachable Jumps": json_stats["unreachable_jumps"],
+                        "Total solved Jumps": json_stats["precisely_solved_jumps"]
+                        + json_stats["soundly_solved_jumps"],
+                        "% Precisely Solved": precisely_solved_percentage,
+                        "% Total Solved": total_solved_percentage,
                     }
                 ]
             )
@@ -279,11 +307,22 @@ for file in os.listdir(json_output_dir):
                     pd.DataFrame(
                         [
                             {
-                                "contract": file.split(".")[0],
-                                "total_jumps": total_jumps,
-                                **json_stats,
-                                "unsolved_jumps": unsolved_jumps,
-                                "solved_percentage": solved_percentage,
+                                "Smart Contract": file.split(".")[0],
+                                "Total Opcodes": total_opcodes,
+                                "Total Jumps": total_jumps,
+                                "Precisely solved Jumps": json_stats[
+                                    "precisely_solved_jumps"
+                                ],
+                                "Sound solved Jumps": json_stats[
+                                    "soundly_solved_jumps"
+                                ],
+                                "Unreachable Jumps": json_stats["unreachable_jumps"],
+                                "Total solved Jumps": json_stats[
+                                    "precisely_solved_jumps"
+                                ]
+                                + json_stats["soundly_solved_jumps"],
+                                "% Precisely Solved": precisely_solved_percentage,
+                                "% Total Solved": total_solved_percentage,
                             }
                         ]
                     ),
@@ -315,16 +354,19 @@ print("Done!")
 total_contracts = dataframe.shape[0]
 
 # Mean of percentage of solved jumps
-mean_solved_percentage = dataframe["solved_percentage"].mean()
+mean_total_solved_percentage = dataframe["% Total Solved"].mean()
+mean_precisely_solved_percentage = dataframe["% Precisely Solved"].mean()
 
 # Print the stats
 log.info(f"Total number of contracts: {total_contracts}")
-log.info(f"Mean of percentage of solved jumps: {mean_solved_percentage}")
+log.info(f"Mean of percentage of solved jumps: {mean_total_solved_percentage}")
+log.info(f"Mean of percentage of precisely solved jumps: {mean_precisely_solved_percentage}")
 
 print()
 print("#" * 50)
 print("REPORT:")
 print(f"Input had {total_input_contracts} contracts")
 print(f"Total number of contracts (final): {total_contracts}")
-print(f"Mean of percentage of solved jumps: {mean_solved_percentage}")
+print(f"Mean of percentage of solved jumps: {mean_total_solved_percentage}")
+print(f"Mean of percentage of precisely solved jumps: {mean_precisely_solved_percentage}")
 print("#" * 50)
