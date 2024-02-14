@@ -47,20 +47,18 @@ class Analyzer:
 
         raise Exception(f"Block with offset {offset} not found")
 
+    # Given a block offset, it returns its destinations
+    def __get_dests_from_offset(self, offset: int) -> list:
+        dests: list = []
+        for edge in self.__edges:
+            if edge["from"] == offset:
+                dests.extend(list(set(edge["to"])))
+        return list(set(dests))
+
     # Given a block, it returns its destinations
     def __get_dests_from_block(self, block: dict) -> list:
         block_offset = block["offset"]
-        for edge in self.__edges:
-            if edge["from"] == block_offset:
-                return edge["to"]
-        return []
-    
-    # Given a block offset, it returns its destinations
-    def __get_dests_from_offset(self, offset: int) -> list:
-        for edge in self.__edges:
-            if edge["from"] == offset:
-                return edge["to"]
-        return []
+        return self.__get_dests_from_offset(block_offset)
 
     # Given a string representing an opcode, it returns its type
     def __get_op_type(self, op: str) -> NodeType:
@@ -96,95 +94,29 @@ class Analyzer:
 
     # Given a jump and its block, it returns True if the jump is precisely
     # solved, False otherwise.
-    # A JUMP is precisely solved if it has a JUMPDEST as its one and only
-    # destination.
-    # A JUMPI is precisely solved if it has exactly two destinations:
-    # |- a JUMPDEST
-    # |- a non-JUMPDEST
     def __is_precisely_solved(self, jump: NodeType, block: dict) -> bool:
         dests = self.__get_dests_from_block(block)
 
         if jump == NodeType.JUMP:
-            if len(dests) != 1:
-                return False
-            try:
-                dest_block = self.__get_block(dests[0])
-                dest_op = self.__get_block_first_last_opcodes(dest_block)[0]
-                return dest_op == NodeType.JUMPDEST
-            except Exception as e:
-                raise Exception(str(e))
+            return len(dests) == 1
 
         if jump == NodeType.JUMPI:
-            if len(dests) != 2:
-                return False
-
-            try:
-                first_dest_block = self.__get_block(dests[0])
-                first_dest_op, _ = self.__get_block_first_last_opcodes(first_dest_block)
-
-                second_dest_block = self.__get_block(dests[1])
-                second_dest_op, _ = self.__get_block_first_last_opcodes(
-                    second_dest_block
-                )
-
-                if (
-                    first_dest_op == NodeType.JUMPDEST
-                    and second_dest_op != NodeType.JUMPDEST
-                ) or (
-                    first_dest_op != NodeType.JUMPDEST
-                    and second_dest_op == NodeType.JUMPDEST
-                ):
-                    return True
-                return False
-            except Exception as e:
-                raise Exception(str(e))
+            return len(dests) == 2
 
         raise Exception("Trying to precisely solve a non-JUMP or non-JUMPI opcode")
 
     # Given a jump and its block, it returns True if the jump is soundly
     # solved, False otherwise.
-    # A JUMP is soundly solved if it has a JUMPDEST as one of its destinations
-    # and the other destination is unreachable.
-    # A JUMPI is soundly solved if it has a JUMPDEST as one of its destinations
-    # and one of the other destinations is a non-JUMPDEST
     def __is_soundly_solved(self, jump: NodeType, block: dict) -> bool:
         dests = self.__get_dests_from_block(block)
 
         if jump == NodeType.JUMP:
-            if len(dests) < 1:
-                return False
-            try:
-                for dest in dests:
-                    dest_block = self.__get_block(dest)
-                    dest_op = self.__get_block_first_last_opcodes(dest_block)[0]
-                    if dest_op == NodeType.JUMPDEST:
-                        return True
-                return False
-            except Exception as e:
-                raise Exception(str(e))
+            return len(dests) > 1
 
         if jump == NodeType.JUMPI:
-            if len(dests) < 2:
-                return False
+            return len(dests) > 2
 
-            jumpdest_found = False
-            non_jumpdest_found = False
-            try:
-                for dest in dests:
-                    dest_block = self.__get_block(dest)
-                    dest_op = self.__get_block_first_last_opcodes(dest_block)[0]
-                    if dest_op == NodeType.JUMPDEST:
-                        jumpdest_found = True
-                    else:
-                        non_jumpdest_found = True
-
-                    if jumpdest_found and non_jumpdest_found:
-                        return True
-                return False
-            except Exception as e:
-                raise Exception(str(e))
-
-        raise Exception("Trying to soundly solve a non-JUMP or non-JUMPI opcode")
+        raise Exception("Trying to precisely solve a non-JUMP or non-JUMPI opcode")
 
     # Given a jump and its block, it returns True if the jump is unreachable,
     # False otherwise.
