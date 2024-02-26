@@ -30,12 +30,13 @@ def download_bytecode(output_dir: str, contract_address: str, api_key: str):
 
     log.info(f"Downloading bytecode for contract {contract_address}")
     response = requests.get(url)
-    result = response.json()["result"]
+    response_json = response.json()
 
-    # Error handling
-    if "error" in result.lower():
-        log.error(f"[{result}] error in downloading bytecode for contract {contract_address}")
+    if "result" not in response_json:
+        log.error(f"Error in downloading bytecode for contract {contract_address}, response: {response.json()}")
         raise Exception()
+
+    result = response_json["result"]
 
     # Save the bytecode to a file
     filename = f"{contract_address}.bytecode"

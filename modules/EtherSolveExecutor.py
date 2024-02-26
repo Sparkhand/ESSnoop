@@ -16,6 +16,10 @@ def run(bytecode_file: str, output_dir: str):
     # Extract filename without extension and parent directory
     result_filename = os.path.basename(bytecode_file).split(".")[0]
 
+    if os.path.exists(f"{output_dir}/{result_filename}.json"):
+        log.info(f"Analysis for {result_filename} already exists, skipping")
+        return
+
     log.info(f"Launching EtherSolve analysis for {result_filename}")
 
     # Run EtherSolve.jar
@@ -37,7 +41,9 @@ def run(bytecode_file: str, output_dir: str):
 
     # Raise exception with stderr if the process failed
     if proc.returncode != 0:
-        log.error(f"Error in running EtherSolve for {result_filename}, reason:\n {proc.stderr.read().decode('utf-8')}")
+        log.error(
+            f"Error in running EtherSolve for {result_filename}, reason:\n {proc.stderr.read().decode('utf-8')}"
+        )
         raise Exception()
 
     # Log success

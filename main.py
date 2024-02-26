@@ -1,5 +1,6 @@
 import os
 import time
+import argparse
 import pandas as pd
 from progress.bar import FillingCirclesBar
 
@@ -48,274 +49,317 @@ def get_total_jumps(filename: str) -> int:
     return count
 
 
-###########################################################
-# Setup
-###########################################################
+def main():
+    ###########################################################
+    # Parse command line arguments
+    ###########################################################
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(
+        prog="main.py",
+        description="Analyzes smart contracts using EtherSolve and computes stats on anlysis outcomes",
+    )
 
-contracts_input_file = "fair_input_contracts"
-bytecode_output_dir = "bytecode"
-opcodes_output_dir = "opcodes"
-json_output_dir = "analyzed"
-report_file = "ethersolve_report.csv"
+    parser.add_argument(
+        "contracts-filename",
+        help="File containing the list of smart contracts to analyze",
+    )
 
-# Clear the log file
-with open("logs.txt", "w"):
-    pass
-# Create a logger
-log = Logger.get_logger(__name__)
+    parser.add_argument(
+        "-o",
+        "--outfile",
+        metavar="CSV_OUTFILE",
+        help="CSV output filename",
+        default="ethersolve_report.csv",
+    )
 
-# Retrieve EthersScan API key
-api_key = os.getenv("ETHERSCAN_API_KEY")
+    ###########################################################
+    # Setup
+    ###########################################################
 
-# Check if EtherScan API key is set
-if api_key is None:
-    printError("ERROR! EtherScan API key (ETHERSCAN_API_KEY) is not set")
-    log.error("EtherScan API key (ETHERSCAN_API_KEY) is not set")
-    exit(1)
+    contracts_input_file = vars(parser.parse_args())["contracts-filename"]
+    bytecode_output_dir = "bytecode"
+    opcodes_output_dir = "opcodes"
+    json_output_dir = "analyzed"
+    report_file = vars(parser.parse_args())["outfile"]
 
-# Check if EtherSolve.jar is in the current directory
-if not os.path.exists("EtherSolve.jar"):
-    printError("ERROR! EtherSolve.jar not found in the current directory")
-    log.error("EtherSolve.jar not found in the current directory")
-    exit(1)
+    # Clear directories
+    for directory in [bytecode_output_dir, opcodes_output_dir, json_output_dir]:
+        if os.path.exists(directory):
+            for filename in os.listdir(directory):
+                os.remove(os.path.join(directory, filename))
+            os.rmdir(directory)
 
-# Check if input_contracts file is in the current directory
-if not os.path.exists(contracts_input_file):
-    printError(f"ERROR! {contracts_input_file} file not found in the current directory")
-    log.error(f"{contracts_input_file} file not found in the current directory")
-    exit(1)
+    # Clear the log file
+    with open("logs.txt", "w"):
+        pass
+    # Create a logger
+    log = Logger.get_logger(__name__)
 
-###########################################################
-# Download bytecode of contracts
-###########################################################
+    # Retrieve EthersScan API key
+    api_key = os.getenv("ETHERSCAN_API_KEY")
 
-# Check if the output dir exists
-if not os.path.exists(bytecode_output_dir):
-    os.makedirs(bytecode_output_dir)
+    # Check if EtherScan API key is set
+    if api_key is None:
+        printError("ERROR! EtherScan API key (ETHERSCAN_API_KEY) is not set")
+        log.error("EtherScan API key (ETHERSCAN_API_KEY) is not set")
+        exit(1)
 
-total_input_contracts = sum(1 for line in open(contracts_input_file))
-pbar = FillingCirclesBar(
-    "Downloading bytecode",
-    max=total_input_contracts,
-    suffix="%(percent)d%% [%(index)d / %(max)d]",
-)
+    # Check if EtherSolve.jar is in the current directory
+    if not os.path.exists("EtherSolve.jar"):
+        printError("ERROR! EtherSolve.jar not found in the current directory")
+        log.error("EtherSolve.jar not found in the current directory")
+        exit(1)
 
-ended_with_error = False
-involved_in_error = []
+    # Check if input_contracts file is in the current directory
+    if not os.path.exists(contracts_input_file):
+        printError(
+            f"ERROR! {contracts_input_file} file not found in the current directory"
+        )
+        log.error(f"{contracts_input_file} file not found in the current directory")
+        exit(1)
 
-# For each line in the input file, download the bytecode of the contract
-with open(contracts_input_file, "r") as file:
+    ###########################################################
+    # Download bytecode of contracts
+    ###########################################################
+
+    # Check if the output dir exists
+    if not os.path.exists(bytecode_output_dir):
+        os.makedirs(bytecode_output_dir)
+
+    total_input_contracts = sum(1 for line in open(contracts_input_file))
+    pbar = FillingCirclesBar(
+        "Downloading bytecode",
+        max=total_input_contracts,
+        suffix="%(percent)d%% [%(index)d / %(max)d]",
+    )
+
+    ended_with_error = False
+    involved_in_error = []
+
+    # For each line in the input file, download the bytecode of the contract
+    contracts_addresses = []
+    with open(contracts_input_file, "r") as file:
+        for line in file:
+            contract_address = line.strip()
+            contracts_addresses.append(contract_address)
+
     count = 0
-    for line in file:
-        contract_address = line.strip()
-
+    for contract_address in contracts_addresses:
         try:
             Downloader.download_bytecode(bytecode_output_dir, contract_address, api_key)
-        except Exception as e:
-            log.error(str(e))
-            ended_with_error = True
+        except Exception:
             involved_in_error.append(contract_address)
-        pbar.next()
-
-        # Pause every 5 requests to avoid rate limiting
+            ended_with_error = True
+        finally:
+            pbar.next()
         count += 1
         if count % 5 == 0:
-            time.sleep(0.005)
-pbar.finish()
+            time.sleep(0.01)
+    pbar.finish()
 
-# Check for errors
-if ended_with_error:
-    printError(
-        "Errors occurred during bytecode downloading, check the logs for more info"
-    )
-    printError(f"Contracts involved in errors:")
-    printContractsInvolvedInErrors(involved_in_error)
-
-###########################################################
-# Parse the bytecode and extract opcodes
-###########################################################
-
-# Check if the output dir exists
-if not os.path.exists(opcodes_output_dir):
-    os.makedirs(opcodes_output_dir)
-
-total_to_parse = len(os.listdir(bytecode_output_dir))
-pbar = FillingCirclesBar(
-    "Parsing bytecode",
-    max=total_to_parse,
-    suffix="%(percent)d%% [%(index)d / %(max)d]",
-)
-
-ended_with_error = False
-involved_in_error = []
-
-for file in os.listdir(bytecode_output_dir):
-    if file.endswith(".bytecode"):
-        bytecode_file = os.path.join(bytecode_output_dir, file)
-        try:
-            BytecodeParser.parseBytecode(bytecode_file, opcodes_output_dir)
-        except Exception:
-            ended_with_error = True
-            involved_in_error.append(os.path.basename(bytecode_file).split(".")[0])
-        pbar.next()
-pbar.finish()
-
-# Check for errors
-if ended_with_error:
-    printError("Errors occurred during bytecode parsing, check the logs for more info")
-    printError(f"Contracts involved in errors:")
-    printContractsInvolvedInErrors(involved_in_error)
-
-###########################################################
-# Compute the JSON files for each contract via EtherSolve
-###########################################################
-
-# Check if the output dir exists
-if not os.path.exists(json_output_dir):
-    os.makedirs(json_output_dir)
-
-total_downloaded = len(os.listdir(bytecode_output_dir))
-ended_with_error = False
-involved_in_error = []
-
-pbar = FillingCirclesBar(
-    "Executing EtherSolve",
-    max=total_downloaded,
-    suffix="%(percent)d%% [%(index)d / %(max)d]",
-)
-for file in os.listdir(bytecode_output_dir):
-    if file.endswith(".bytecode"):
-        bytecode_file = os.path.join(bytecode_output_dir, file)
-        try:
-            EtherSolve.run(bytecode_file, json_output_dir)
-        except Exception:
-            ended_with_error = True
-            involved_in_error.append(os.path.basename(bytecode_file).split(".")[0])
-        pbar.next()
-pbar.finish()
-
-# Check for errors
-if ended_with_error:
-    printError(
-        "Errors occurred during EtherSolve analysis, check the logs for more info"
-    )
-    printError(f"Contracts involved in errors:")
-    printContractsInvolvedInErrors(involved_in_error)
-
-###########################################################
-# Analyze the JSON files and retrieve stats, then add them to a Pandas DataFrame
-###########################################################
-
-dataframe = pd.DataFrame(
-    columns=[
-        "Smart Contract",
-        "Total Opcodes",
-        "Total Jumps",
-        "Solved Jumps" "Not Solved Jumps",
-    ]
-)
-
-pbar = FillingCirclesBar(
-    "Analyzing JSON files",
-    max=len(os.listdir(json_output_dir)),
-    suffix="%(percent)d%% [%(index)d / %(max)d]",
-)
-
-ended_with_error = False
-involved_in_error = []
-
-for file in os.listdir(json_output_dir):
-    if file.endswith(".json"):
-        # First, retrieve the total number of JUMP and JUMPI statements from
-        # the .opcodes file
-        opcodes_file = os.path.join(opcodes_output_dir, file.split(".")[0] + ".opcodes")
-        if not os.path.exists(opcodes_file):
-            log.error(f"Opcodes file {opcodes_file} not found")
-            continue
-        total_opcodes = get_total_opcodes(opcodes_file)
-        total_jumps = get_total_jumps(opcodes_file)
-
-        # Then, analyze the JSON file
-        json_stats = {}
-        unsolved_jumps = 0  # Total - Precisely - Soundly - Unreachable
-
-        analyzer = JsonAnalyzer.Analyzer(os.path.join(json_output_dir, file))
-        try:
-            json_stats = analyzer.analyze()
-        except Exception:
-            ended_with_error = True
-            involved_in_error.append(os.path.basename(file).split(".")[0])
-            continue
-        finally:
-            del analyzer  # Free resources
-
-        # Compute stats as per dataframe columns
-        smart_contract = file.split(".")[0]
-        solved_jumps = (
-            json_stats["precisely_solved_jumps"] + json_stats["soundly_solved_jumps"]
+    # Check for errors
+    if ended_with_error:
+        printError(
+            "Errors occurred during bytecode downloading, check the logs for more info"
         )
-        not_solved_jumps = total_jumps - solved_jumps
+        printError(f"Contracts involved in errors:")
+        printContractsInvolvedInErrors(involved_in_error)
 
-        # Add the stats to the DataFrame
-        to_insert: pd.DataFrame = pd.DataFrame(
-            [
-                {
-                    "Smart Contract": smart_contract,
-                    "Total Opcodes": total_opcodes,
-                    "Total Jumps": total_jumps,
-                    "Solved Jumps": solved_jumps,
-                    "Not Solved Jumps": not_solved_jumps,
-                }
-            ]
+    ###########################################################
+    # Parse the bytecode and extract opcodes
+    ###########################################################
+
+    # Check if the output dir exists
+    if not os.path.exists(opcodes_output_dir):
+        os.makedirs(opcodes_output_dir)
+
+    total_to_parse = len(os.listdir(bytecode_output_dir))
+    pbar = FillingCirclesBar(
+        "Parsing bytecode",
+        max=total_to_parse,
+        suffix="%(percent)d%% [%(index)d / %(max)d]",
+    )
+
+    ended_with_error = False
+    involved_in_error = []
+
+    for file in os.listdir(bytecode_output_dir):
+        if file.endswith(".bytecode"):
+            bytecode_file = os.path.join(bytecode_output_dir, file)
+            try:
+                BytecodeParser.parseBytecode(bytecode_file, opcodes_output_dir)
+            except Exception:
+                ended_with_error = True
+                involved_in_error.append(os.path.basename(bytecode_file).split(".")[0])
+            finally:
+                pbar.next()
+    pbar.finish()
+
+    # Check for errors
+    if ended_with_error:
+        printError(
+            "Errors occurred during bytecode parsing, check the logs for more info"
         )
+        printError(f"Contracts involved in errors:")
+        printContractsInvolvedInErrors(involved_in_error)
 
-        if dataframe.empty:
-            dataframe = to_insert
-        else:
-            dataframe = pd.concat([dataframe, to_insert])
+    ###########################################################
+    # Compute the JSON files for each contract via EtherSolve
+    ###########################################################
 
-        pbar.next()
+    # Check if the output dir exists
+    if not os.path.exists(json_output_dir):
+        os.makedirs(json_output_dir)
 
-pbar.finish()
+    total_downloaded = len(os.listdir(bytecode_output_dir))
+    ended_with_error = False
+    involved_in_error = []
 
-# Check for errors
-if ended_with_error:
-    printError("Errors occurred during JSON analysis, check the logs for more info")
-    printError(f"Contracts involved in errors:")
-    printContractsInvolvedInErrors(involved_in_error)
+    pbar = FillingCirclesBar(
+        "Executing EtherSolve",
+        max=total_downloaded,
+        suffix="%(percent)d%% [%(index)d / %(max)d]",
+    )
+    for file in os.listdir(bytecode_output_dir):
+        if file.endswith(".bytecode"):
+            bytecode_file = os.path.join(bytecode_output_dir, file)
+            try:
+                EtherSolve.run(bytecode_file, json_output_dir)
+            except Exception:
+                ended_with_error = True
+                involved_in_error.append(os.path.basename(bytecode_file).split(".")[0])
+            finally:
+                pbar.next()
+    pbar.finish()
 
-###########################################################
-# Write the DataFrame to a .csv file, and analyze the data with Pandas
-###########################################################
+    # Check for errors
+    if ended_with_error:
+        printError(
+            "Errors occurred during EtherSolve analysis, check the logs for more info"
+        )
+        printError(f"Contracts involved in errors:")
+        printContractsInvolvedInErrors(involved_in_error)
 
-# Write the DataFrame to a .csv file
-print(f"Writing report to {report_file}... ", end="")
-dataframe.to_csv(report_file, index=False)
-print("Done!")
+    ###########################################################
+    # Analyze the JSON files and retrieve stats, then add them to a Pandas DataFrame
+    ###########################################################
 
-# Analyze the data with Pandas and get some stats
+    dataframe = pd.DataFrame(
+        columns=[
+            "Smart Contract",
+            "Total Opcodes",
+            "Total Jumps",
+            "Solved Jumps" "Not Solved Jumps",
+        ]
+    )
 
-# Total number of contracts (final)
-total_contracts = dataframe.shape[0]
+    pbar = FillingCirclesBar(
+        "Analyzing JSON files",
+        max=len(os.listdir(json_output_dir)),
+        suffix="%(percent)d%% [%(index)d / %(max)d]",
+    )
 
-# Mean of percentage of solved jumps
-mean_total_solved_percentage = dataframe["% Total Solved"].mean()
-mean_precisely_solved_percentage = dataframe["% Precisely Solved"].mean()
+    ended_with_error = False
+    involved_in_error = []
 
-# Print the stats
-log.info(f"Total number of contracts: {total_contracts}")
-log.info(f"Mean of percentage of solved jumps: {mean_total_solved_percentage}")
-log.info(
-    f"Mean of percentage of precisely solved jumps: {mean_precisely_solved_percentage}"
-)
+    for file in os.listdir(json_output_dir):
+        if file.endswith(".json"):
+            # First, retrieve the total number of JUMP and JUMPI statements from
+            # the .opcodes file
+            opcodes_file = os.path.join(
+                opcodes_output_dir, file.split(".")[0] + ".opcodes"
+            )
+            if not os.path.exists(opcodes_file):
+                log.error(f"Opcodes file {opcodes_file} not found")
+                continue
+            total_opcodes = get_total_opcodes(opcodes_file)
+            total_jumps = get_total_jumps(opcodes_file)
 
-print()
-print("#" * 50)
-print("REPORT:")
-print(f"Input had {total_input_contracts} contracts")
-print(f"Total number of contracts (final): {total_contracts}")
-print(f"Mean of percentage of solved jumps: {mean_total_solved_percentage}")
-print(
-    f"Mean of percentage of precisely solved jumps: {mean_precisely_solved_percentage}"
-)
-print("#" * 50)
+            # Then, analyze the JSON file
+            json_stats = {}
+            unsolved_jumps = 0  # Total - Precisely - Soundly - Unreachable
+
+            analyzer = JsonAnalyzer.Analyzer(os.path.join(json_output_dir, file))
+            try:
+                json_stats = analyzer.analyze()
+            except Exception:
+                ended_with_error = True
+                involved_in_error.append(os.path.basename(file).split(".")[0])
+                continue
+            finally:
+                del analyzer  # Free resources
+
+            # Compute stats as per dataframe columns
+            smart_contract = file.split(".")[0]
+            solved_jumps = (
+                json_stats["precisely_solved_jumps"]
+                + json_stats["soundly_solved_jumps"]
+            )
+            not_solved_jumps = total_jumps - solved_jumps
+
+            # Add the stats to the DataFrame
+            to_insert: pd.DataFrame = pd.DataFrame(
+                [
+                    {
+                        "Smart Contract": smart_contract,
+                        "Total Opcodes": total_opcodes,
+                        "Total Jumps": total_jumps,
+                        "Solved Jumps": solved_jumps,
+                        "Not Solved Jumps": not_solved_jumps,
+                    }
+                ]
+            )
+
+            if dataframe.empty:
+                dataframe = to_insert
+            else:
+                dataframe = pd.concat([dataframe, to_insert])
+
+            pbar.next()
+
+    pbar.finish()
+
+    # Check for errors
+    if ended_with_error:
+        printError("Errors occurred during JSON analysis, check the logs for more info")
+        printError(f"Contracts involved in errors:")
+        printContractsInvolvedInErrors(involved_in_error)
+
+    ###########################################################
+    # Write the DataFrame to a .csv file, and analyze the data with Pandas
+    ###########################################################
+
+    # Write the DataFrame to a .csv file
+    print(f"Writing report to {report_file}... ", end="")
+    dataframe.to_csv(report_file, index=False)
+    print("Done!")
+
+    # Analyze the data with Pandas and get some stats
+
+    # Total number of contracts (final)
+    total_contracts = dataframe.shape[0]
+
+    # Mean of percentage of solved jumps
+    mean_total_solved_percentage = dataframe["% Total Solved"].mean()
+    mean_precisely_solved_percentage = dataframe["% Precisely Solved"].mean()
+
+    # Print the stats
+    log.info(f"Total number of contracts: {total_contracts}")
+    log.info(f"Mean of percentage of solved jumps: {mean_total_solved_percentage}")
+    log.info(
+        f"Mean of percentage of precisely solved jumps: {mean_precisely_solved_percentage}"
+    )
+
+    print()
+    print("#" * 50)
+    print("REPORT:")
+    print(f"Input had {total_input_contracts} contracts")
+    print(f"Total number of contracts (final): {total_contracts}")
+    print(f"Mean of percentage of solved jumps: {mean_total_solved_percentage}")
+    print(
+        f"Mean of percentage of precisely solved jumps: {mean_precisely_solved_percentage}"
+    )
+    print("#" * 50)
+
+
+if __name__ == "__main__":
+    main()
