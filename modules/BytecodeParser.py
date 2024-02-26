@@ -11,6 +11,10 @@ log = Logger.get_logger(__name__)
 
 
 def parseBytecode(input_file: str, output_dir: str):
+    # Check if input file exists
+    if not os.path.exists(input_file):
+        raise Exception(f"File {input_file} does not exist")
+    
     result_filename = os.path.basename(input_file).split(".")[0]
 
     # Read bytecode from input file

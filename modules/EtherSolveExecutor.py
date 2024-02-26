@@ -13,6 +13,10 @@ log = Logger.get_logger(__name__)
 
 # Run EtherSolve.jar
 def run(bytecode_file: str, output_dir: str):
+    # Check if input file exists
+    if not os.path.exists(bytecode_file):
+        raise Exception(f"File {bytecode_file} does not exist")
+
     # Extract filename without extension and parent directory
     result_filename = os.path.basename(bytecode_file).split(".")[0]
 
