@@ -333,33 +333,5 @@ def main():
     dataframe.to_csv(report_file, index=False)
     print("Done!")
 
-    # Analyze the data with Pandas and get some stats
-
-    # Total number of contracts (final)
-    total_contracts = dataframe.shape[0]
-
-    # Mean of percentage of solved jumps
-    mean_total_solved_percentage = dataframe["% Total Solved"].mean()
-    mean_precisely_solved_percentage = dataframe["% Precisely Solved"].mean()
-
-    # Print the stats
-    log.info(f"Total number of contracts: {total_contracts}")
-    log.info(f"Mean of percentage of solved jumps: {mean_total_solved_percentage}")
-    log.info(
-        f"Mean of percentage of precisely solved jumps: {mean_precisely_solved_percentage}"
-    )
-
-    print()
-    print("#" * 50)
-    print("REPORT:")
-    print(f"Input had {total_input_contracts} contracts")
-    print(f"Total number of contracts (final): {total_contracts}")
-    print(f"Mean of percentage of solved jumps: {mean_total_solved_percentage}")
-    print(
-        f"Mean of percentage of precisely solved jumps: {mean_precisely_solved_percentage}"
-    )
-    print("#" * 50)
-
-
 if __name__ == "__main__":
     main()
