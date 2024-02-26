@@ -52,7 +52,7 @@ def get_total_jumps(filename: str) -> int:
 # Setup
 ###########################################################
 
-contracts_input_file = "input_contracts"
+contracts_input_file = "fair_input_contracts"
 bytecode_output_dir = "bytecode"
 opcodes_output_dir = "opcodes"
 json_output_dir = "analyzed"
@@ -209,13 +209,10 @@ if ended_with_error:
 dataframe = pd.DataFrame(
     columns=[
         "Smart Contract",
-        "Total Opcodes" "Total Jumps",
-        "Precisely solved Jumps",
-        "Sound solved Jumps",
-        "Unreachable Jumps",
-        "Total solved Jumps",
-        "% Precisely Solved",
-        "% Total Solved",
+        "Total Opcodes",
+        "Total Jumps",
+        "Solved Jumps"
+        "Not Solved Jumps"
     ]
 )
 
@@ -253,34 +250,12 @@ for file in os.listdir(json_output_dir):
         finally:
             del analyzer  # Free resources
 
-        # Compute additional stats:
-        # |- unsolved_jumps = total_jumps - precisely_solved_jumps - soundly_solved_jumps - unreachable_jumps
-        # |- precisely_solved_percentage = precisely_solved_jumps / (total_jumps - unreachable_jumps)
-        # |- total_solved_percentage = (precisely_solved_jumps + soundly_solved_jumps) / (total_jumps - unreachable_jumps)
+        # Compute stats as per dataframe columns
+        smart_contract = file.split(".")[0]
+        solved_jumps = json_stats["precisely_solved_jumps"] \
+                     + json_stats["soundly_solved_jumps"]
+        not_solved_jumps = total_jumps - solved_jumps
 
-        # unsolved_jumps = (
-        #     total_jumps
-        #     - json_stats["precisely_solved_jumps"]
-        #     - json_stats["soundly_solved_jumps"]
-        #     - json_stats["unreachable_jumps"]
-        # )
-
-        precisely_solved_percentage = -1
-        try:
-            precisely_solved_percentage = (json_stats["precisely_solved_jumps"]) / (
-                total_jumps - json_stats["unreachable_jumps"]
-            )
-        except ZeroDivisionError:
-            precisely_solved_percentage = -1
-
-        total_solved_percentage = -1
-        try:
-            total_solved_percentage = (
-                json_stats["precisely_solved_jumps"]
-                + json_stats["soundly_solved_jumps"]
-            ) / (total_jumps - json_stats["unreachable_jumps"])
-        except ZeroDivisionError:
-            total_solved_percentage = -1
 
         # Add the stats to the DataFrame
         if dataframe.empty:
@@ -290,13 +265,8 @@ for file in os.listdir(json_output_dir):
                         "Smart Contract": file.split(".")[0],
                         "Total Opcodes": total_opcodes,
                         "Total Jumps": total_jumps,
-                        "Precisely solved Jumps": json_stats["precisely_solved_jumps"],
-                        "Sound solved Jumps": json_stats["soundly_solved_jumps"],
-                        "Unreachable Jumps": json_stats["unreachable_jumps"],
-                        "Total solved Jumps": json_stats["precisely_solved_jumps"]
-                        + json_stats["soundly_solved_jumps"],
-                        "% Precisely Solved": precisely_solved_percentage,
-                        "% Total Solved": total_solved_percentage,
+                        "Solved Jumps": solved_jumps,
+                        "Not Solved Jumps": not_solved_jumps
                     }
                 ]
             )

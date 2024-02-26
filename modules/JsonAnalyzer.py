@@ -52,7 +52,7 @@ class Analyzer:
         dests: list = []
         for edge in self.__edges:
             if edge["from"] == offset:
-                dests.extend(list(set(edge["to"])))
+                dests = dests + list(set(edge["to"]))
         return list(set(dests))
 
     # Given a block, it returns its destinations
@@ -98,10 +98,39 @@ class Analyzer:
         dests = self.__get_dests_from_block(block)
 
         if jump == NodeType.JUMP:
-            return len(dests) == 1
+            if len(dests) != 1:
+                return False
+            try:
+                dest_block = self.__get_block(dests[0])
+                dest_op = self.__get_block_first_last_opcodes(dest_block)[0]
+                return dest_op == NodeType.JUMPDEST
+            except Exception as e:
+                raise Exception(str(e))
 
         if jump == NodeType.JUMPI:
-            return len(dests) == 2
+            if len(dests) != 2:
+                return False
+
+            try:
+                first_dest_block = self.__get_block(dests[0])
+                first_dest_op, _ = self.__get_block_first_last_opcodes(first_dest_block)
+
+                second_dest_block = self.__get_block(dests[1])
+                second_dest_op, _ = self.__get_block_first_last_opcodes(
+                    second_dest_block
+                )
+
+                if (
+                    first_dest_op == NodeType.JUMPDEST
+                    and second_dest_op != NodeType.JUMPDEST
+                ) or (
+                    first_dest_op != NodeType.JUMPDEST
+                    and second_dest_op == NodeType.JUMPDEST
+                ):
+                    return True
+                return False
+            except Exception as e:
+                raise Exception(str(e))
 
         raise Exception("Trying to precisely solve a non-JUMP or non-JUMPI opcode")
 
@@ -111,12 +140,40 @@ class Analyzer:
         dests = self.__get_dests_from_block(block)
 
         if jump == NodeType.JUMP:
-            return len(dests) > 1
+            if len(dests) < 1:
+                return False
+            try:
+                for dest in dests:
+                    dest_block = self.__get_block(dest)
+                    dest_op = self.__get_block_first_last_opcodes(dest_block)[0]
+                    if dest_op == NodeType.JUMPDEST:
+                        return True
+                return False
+            except Exception as e:
+                raise Exception(str(e))
 
         if jump == NodeType.JUMPI:
-            return len(dests) > 2
+            if len(dests) < 2:
+                return False
 
-        raise Exception("Trying to precisely solve a non-JUMP or non-JUMPI opcode")
+            jumpdest_found = False
+            non_jumpdest_found = False
+            try:
+                for dest in dests:
+                    dest_block = self.__get_block(dest)
+                    dest_op = self.__get_block_first_last_opcodes(dest_block)[0]
+                    if dest_op == NodeType.JUMPDEST:
+                        jumpdest_found = True
+                    else:
+                        non_jumpdest_found = True
+
+                    if jumpdest_found and non_jumpdest_found:
+                        return True
+                return False
+            except Exception as e:
+                raise Exception(str(e))
+
+        raise Exception("Trying to soundly solve a non-JUMP or non-JUMPI opcode")
 
     # Given a jump and its block, it returns True if the jump is unreachable,
     # False otherwise.
