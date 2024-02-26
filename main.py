@@ -211,8 +211,7 @@ dataframe = pd.DataFrame(
         "Smart Contract",
         "Total Opcodes",
         "Total Jumps",
-        "Solved Jumps"
-        "Not Solved Jumps"
+        "Solved Jumps" "Not Solved Jumps",
     ]
 )
 
@@ -252,52 +251,28 @@ for file in os.listdir(json_output_dir):
 
         # Compute stats as per dataframe columns
         smart_contract = file.split(".")[0]
-        solved_jumps = json_stats["precisely_solved_jumps"] \
-                     + json_stats["soundly_solved_jumps"]
+        solved_jumps = (
+            json_stats["precisely_solved_jumps"] + json_stats["soundly_solved_jumps"]
+        )
         not_solved_jumps = total_jumps - solved_jumps
 
-
         # Add the stats to the DataFrame
+        to_insert: pd.DataFrame = pd.DataFrame(
+            [
+                {
+                    "Smart Contract": smart_contract,
+                    "Total Opcodes": total_opcodes,
+                    "Total Jumps": total_jumps,
+                    "Solved Jumps": solved_jumps,
+                    "Not Solved Jumps": not_solved_jumps,
+                }
+            ]
+        )
+
         if dataframe.empty:
-            dataframe = pd.DataFrame(
-                [
-                    {
-                        "Smart Contract": file.split(".")[0],
-                        "Total Opcodes": total_opcodes,
-                        "Total Jumps": total_jumps,
-                        "Solved Jumps": solved_jumps,
-                        "Not Solved Jumps": not_solved_jumps
-                    }
-                ]
-            )
+            dataframe = to_insert
         else:
-            dataframe = pd.concat(
-                [
-                    dataframe,
-                    pd.DataFrame(
-                        [
-                            {
-                                "Smart Contract": file.split(".")[0],
-                                "Total Opcodes": total_opcodes,
-                                "Total Jumps": total_jumps,
-                                "Precisely solved Jumps": json_stats[
-                                    "precisely_solved_jumps"
-                                ],
-                                "Sound solved Jumps": json_stats[
-                                    "soundly_solved_jumps"
-                                ],
-                                "Unreachable Jumps": json_stats["unreachable_jumps"],
-                                "Total solved Jumps": json_stats[
-                                    "precisely_solved_jumps"
-                                ]
-                                + json_stats["soundly_solved_jumps"],
-                                "% Precisely Solved": precisely_solved_percentage,
-                                "% Total Solved": total_solved_percentage,
-                            }
-                        ]
-                    ),
-                ]
-            )
+            dataframe = pd.concat([dataframe, to_insert])
 
         pbar.next()
 
@@ -330,7 +305,9 @@ mean_precisely_solved_percentage = dataframe["% Precisely Solved"].mean()
 # Print the stats
 log.info(f"Total number of contracts: {total_contracts}")
 log.info(f"Mean of percentage of solved jumps: {mean_total_solved_percentage}")
-log.info(f"Mean of percentage of precisely solved jumps: {mean_precisely_solved_percentage}")
+log.info(
+    f"Mean of percentage of precisely solved jumps: {mean_precisely_solved_percentage}"
+)
 
 print()
 print("#" * 50)
@@ -338,5 +315,7 @@ print("REPORT:")
 print(f"Input had {total_input_contracts} contracts")
 print(f"Total number of contracts (final): {total_contracts}")
 print(f"Mean of percentage of solved jumps: {mean_total_solved_percentage}")
-print(f"Mean of percentage of precisely solved jumps: {mean_precisely_solved_percentage}")
+print(
+    f"Mean of percentage of precisely solved jumps: {mean_precisely_solved_percentage}"
+)
 print("#" * 50)
