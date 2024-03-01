@@ -1,6 +1,6 @@
 # ESSnoop - EtherSolve Snoop 🔎
 
-EtherSolve Snoop is a Python with various submodules which aims at running [EtherSolve](https://github.com/SeUniVr/EtherSolve) for a batch of smart contracts addresses and analyze the outcomes of EtherSolve analysis on the contracts to compute stats of interest.
+EtherSolve Snoop is a Python script with various submodules which aims at running [EtherSolve](https://github.com/SeUniVr/EtherSolve) for a batch of smart contracts addresses and analyze the outcomes of EtherSolve analysis on the contracts to compute stats of interest.
 
 Currently, the tool checks the CFG built by EtherSolve and infers how many JUMP and JUMPI instructions were solved. It then compares them to the actual number of jumps in the contract and computes additional stats between the two. It infers also _how_ every single jump was solved.
 
