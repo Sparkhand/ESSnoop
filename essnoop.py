@@ -40,9 +40,10 @@ def get_parser() -> argparse.ArgumentParser:
 
     # Parser init
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
-        prog="main.py",
-        description="Analyzes smart contracts using EtherSolve and "
-                    "computes stats on analysis outcomes.",
+        prog="essnoop.py",
+        description="ESSnoop - EtherSolve Snoop | Analyzes smart "
+                    "contracts using EtherSolve and computes stats on "
+                    "analysis outcomes.",
     )
 
     # Input filename (positional)

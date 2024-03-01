@@ -1,0 +1,4 @@
+pandas==2.2.1
+progress==1.6
+ratemate==0.1.0
+Requests==2.31.0
