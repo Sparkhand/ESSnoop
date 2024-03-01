@@ -1,53 +1,116 @@
-###########################################################
-# Python module to parse a file containing the bytecode of a contract and
-# extract its opcodes in a .opcodes file.
-###########################################################
+"""Opcodes parser module
 
-import modules.Logger as Logger
+This module contains the logic to parse the bytecode of a smart
+contract (.bytecode file) and extract its opcodes in a .opcodes file.
+"""
+
+
 import os
 
-# Logger
-log = Logger.get_logger(__name__)
+import modules.logger as logger
+
+# region Module info
+
+__all__ = ["parse_bytecode"]
+__version__ = "1.0"
+__author__ = "Davide Tarpini"
+
+# endregion
+
+# region Module functions
 
 
-def parseBytecode(input_file: str, output_dir: str):
-    # Check if input file exists
-    if not os.path.exists(input_file):
-        raise Exception(f"File {input_file} does not exist")
-    
-    result_filename = os.path.basename(input_file).split(".")[0]
+def parse_bytecode(contract_address: str,
+                   input_dir: str,
+                   output_dir: str,
+                   log: logger.logging.Logger | None = None) -> str | None:
+    """Parses the bytecode of a contract and extracts its opcodes
+    in a .opcodes file.
+
+    Args:
+        input_file (str): the .bytecode file to parse.
+        output_dir (str): the directory where the .opcodes file
+                          will be saved.
+        log (logger.logging.Logger | None, optional): the logger to use.
+
+    Returns:
+        str | None: if the .opcodes file was created successfully, None
+                    is returned. Otherwise, input_file is returned.
+    """
+
+    # Compute input and output file paths
+    INFILE_PATH: str = os.path.join(input_dir, f"{contract_address}.bytecode")
+
+    if not os.path.exists(INFILE_PATH):
+        if log is not None:
+            log.error(f"Input file {INFILE_PATH} not found")
+        return contract_address
+
+    OUTFILE_PATH: str = os.path.join(output_dir, f"{contract_address}.opcodes")
+
+    if os.path.exists(OUTFILE_PATH):
+        if log is not None:
+            log.info(f"Opcodes for {contract_address} already parsed")
+        return None
+
+    # Log info to state the beginning of the parsing
+    if log is not None:
+        log.info(f"Parsing opcodes for {contract_address}")
 
     # Read bytecode from input file
-    with open(input_file, "r") as file:
+    bytecode: str = ""
+    with open(INFILE_PATH, "r") as file:
         bytecode = file.read()
 
     # Check if bytecode has at least one opcode
     if len(bytecode) < 4:
-        raise Exception(f"Bytecode for contract {result_filename} is too short")
+        if log is not None:
+            log.error(f"Bytecode for contract {OUTFILE_PATH} is too short")
+        return contract_address
 
     # Check if bytecode starts with 0x
     if bytecode[:2] != "0x":
-        raise Exception(
-            f"Bytecode for contract {result_filename} does not start with 0x"
-        )
+        if log is not None:
+            log.error(f"Bytecode for contract {OUTFILE_PATH} does not "
+                      "start with 0x")
+        return contract_address
 
+    # Do not consider the 0x at the beginning
     bytecode = bytecode[2:]
 
-    outfile = os.path.join(output_dir, f"{result_filename}.opcodes")
-
-    with open(outfile, "w") as file:
-        i = 0
+    # Parse the bytecode
+    with open(OUTFILE_PATH, "w") as file:
+        i: int = 0
         while i < len(bytecode):
-            opcode = bytecode[i : i + 2]
-            bytesForVal = pushBytes(opcode)
-            if bytesForVal == 0:  # Opcode is not a PUSH (or maybe is a PUSH0)
-                file.write(f"{getOpcodeString(opcode)}\n")
+            opcode: str = bytecode[i: i + 2]
+            bytes_for_val: int = push_bytes(opcode)
+
+            # Opcode is not a PUSH (or maybe is a PUSH0)
+            if bytes_for_val == 0:
+                file.write(f"{get_opcode_string(opcode)}\n")
             else:  # Opcode is a PUSH
-                file.write(f"PUSH{bytesForVal} 0x{bytecode[i+2:i+2+bytesForVal*2]}\n")
-                i += bytesForVal * 2
+                file.write(f"PUSH{bytes_for_val} "
+                           f"0x{bytecode[i + 2: i + 2 +bytes_for_val *2]}\n")
+                i += bytes_for_val * 2
+
             i += 2
 
-def getOpcodeString(opcode: str) -> str:
+    if log is not None:
+        log.info(f"Opcodes for {contract_address} successfully parsed")
+    return None
+
+
+def get_opcode_string(opcode: str) -> str:
+    """Given an opcode code in the form of a string, returns its
+    name as a string.
+
+    Args:
+        opcode (str): the code of the opcode.
+
+    Returns:
+        str: the name of the opcode.
+    """
+
     match opcode:
         case "00":
             return "STOP"
@@ -279,7 +342,17 @@ def getOpcodeString(opcode: str) -> str:
             return f"'{opcode}'(Unknown Opcode)"
 
 
-def pushBytes(opcode: str) -> int:
+def push_bytes(opcode: str) -> int:
+    """Given a string of hexadecimal bytes, return the number of bytes
+    that the PUSH opcode will consume.
+
+    Args:
+        opcode (str): the hexadecimal string of bytes.
+
+    Returns:
+        int: the number of bytes that the PUSH opcode will consume.
+    """
+
     match opcode:
         case "60":
             return 1
@@ -347,3 +420,6 @@ def pushBytes(opcode: str) -> int:
             return 32
         case _:
             return 0
+
+
+# endregion
