@@ -46,3 +46,9 @@ options:
                         Specify the name of the EtherSolve jar file (include .jar).
 
 ```
+
+## API Key for Etherscan
+
+Hey, this is important! This tool uses [Etherscan API](https://etherscan.io/apis) to retrieve contract bytecode from the Ethereum blockchain. If you don't have an API key, you can [follow a guide togenerate one here](https://info.etherscan.com/api-keys/).
+
+The API key must be set as an environment variable called `ETHERSCAN_API_KEY` or it can be specified via the `-k --etherscan-api-key` CLI option.
