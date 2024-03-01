@@ -1,7 +1,21 @@
+# Files with no extension
+*
+!*.*
+!*/
+
+# .vscode folder
+.vscode
+
+# PyCache
+__pycache__
+
+# Specific directories
 /analyzed
 /bytecode
 /opcodes
-/quicktest_*
-__pycache__
+
+# CSV Report
 *.csv
-*.txt
+
+# Logs
+*.log
