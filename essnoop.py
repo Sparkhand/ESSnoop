@@ -239,6 +239,8 @@ def retrieve_api_key(actual_key: str) -> str:
             global log
             log.error("EtherScan API key (ETHERSCAN_API_KEY) is not set")
             exit(1)
+    else:
+        api_key = actual_key
 
     return api_key
 
