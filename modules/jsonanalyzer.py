@@ -537,7 +537,7 @@ def analyze(contract_address: str, opcodes_dir: str, json_dir: str,
         "Orphan Jumps": 0,
         "Precisely Solved Jumps": 0,
         "Soundly Solved Jumps": 0,
-        "Not Solved Jumps": 0,
+        "Pending Jumps": 0,
         "Unreachable Jumps": 0,
         "Unsolved Jumps": 0,
     }
@@ -567,7 +567,7 @@ def analyze(contract_address: str, opcodes_dir: str, json_dir: str,
     # Seek for missing jumps
     MISSING_JUMPS: int = (STATS["Total Jumps"]
                           - (STATS["Solved Jumps"]
-                             + STATS["Not Solved Jumps"]))
+                             + STATS["Pending Jumps"]))
 
     if MISSING_JUMPS > 0:
         ENCOUNTERED_ERRORS = True
@@ -578,8 +578,8 @@ def analyze(contract_address: str, opcodes_dir: str, json_dir: str,
     # Missing jumps are considered unreachable jumps
     JUMP_STATS["unreachable_jumps"] += MISSING_JUMPS
 
-    # Recalculate not solved jumps
-    STATS["Not Solved Jumps"] = (JUMP_STATS["unsolved_jumps"]
+    # Recalculate pending jumps
+    STATS["Pending Jumps"] = (JUMP_STATS["unsolved_jumps"]
                                  + JUMP_STATS["unreachable_jumps"])
 
     STATS["Unreachable Jumps"] = JUMP_STATS["unreachable_jumps"]

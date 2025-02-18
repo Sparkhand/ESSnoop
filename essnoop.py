@@ -674,7 +674,7 @@ def main() -> None:
     # Change labels of the DataFrame
     STATS_DF.rename(columns={
         "Solved Jumps": "Solved Jumps (precisely + soundly)",
-        "Not Solved Jumps": "Not Solved Jumps (unreachable + unsolved)",
+        "Pending Jumps": "Pending Jumps (unreachable + unsolved)",
     }, inplace=True)
 
     # Add a label with solved percentage (limit to 2 decimal places)
@@ -691,7 +691,7 @@ def main() -> None:
         "Solved Jumps (precisely + soundly)",
         "Precisely Solved Jumps",
         "Soundly Solved Jumps",
-        "Not Solved Jumps (unreachable + unsolved)",
+        "Pending Jumps (unreachable + unsolved)",
         "Unreachable Jumps",
         "Unsolved Jumps",
     ]]
