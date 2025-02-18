@@ -467,6 +467,34 @@ def get_total_jumps(filename: str) -> int:
 
     return count
 
+def get_total_orphan_jumps(filename: str) -> int:
+    """Given the filename of a .opcodes files, counts the total number
+    of orphan jumps (JUMP which are not preceded by a PUSH).
+
+    Args:
+        filename (str): the filename of the .opcodes file.
+
+    Returns:
+        int: the total number of orphan jumps.
+    """
+
+    count: int = 0
+    last_push: bool = False
+
+    with open(filename, "r") as file:
+        for line in file:
+            line = line.strip()
+            if line.startswith("PUSH"):
+                last_push = True
+            elif line == "JUMP":
+                if not last_push:
+                    count += 1
+                last_push = False
+            else:
+                last_push = False
+
+    return count
+
 
 def analyze(contract_address: str, opcodes_dir: str, json_dir: str,
             log: logger.logging.Logger | None = None) -> tuple[dict, str | None]:
@@ -506,12 +534,18 @@ def analyze(contract_address: str, opcodes_dir: str, json_dir: str,
         "Total Opcodes": 0,
         "Total Jumps": 0,
         "Solved Jumps": 0,
+        "Orphan Jumps": 0,
+        "Precisely Solved Jumps": 0,
+        "Soundly Solved Jumps": 0,
         "Not Solved Jumps": 0,
+        "Unreachable Jumps": 0,
+        "Unsolved Jumps": 0,
     }
 
     # Retrieve total number of opcodes and total number of jumps
     STATS["Total Opcodes"] = get_total_opcodes(INFILE_OP)
     STATS["Total Jumps"] = get_total_jumps(INFILE_OP)
+    STATS["Orphan Jumps"] = get_total_orphan_jumps(INFILE_OP)
 
     # Retrieve JSON data
     with open(INFILE_JSON, "r") as file:
@@ -521,13 +555,14 @@ def analyze(contract_address: str, opcodes_dir: str, json_dir: str,
     analyzer: Analyzer = Analyzer(JSON_DATA, contract_address, log)
     JUMP_STATS, ENCOUNTERED_ERRORS = analyzer.analyze_jumps()
     del analyzer
-
+    
+    
     # Compute additional stats
     STATS["Solved Jumps"] = (JUMP_STATS["precisely_solved_jumps"]
                              + JUMP_STATS["soundly_solved_jumps"])
 
-    STATS["Not Solved Jumps"] = (JUMP_STATS["unsolved_jumps"]
-                                 + JUMP_STATS["unreachable_jumps"])
+    STATS["Precisely Solved Jumps"] = JUMP_STATS["precisely_solved_jumps"]
+    STATS["Soundly Solved Jumps"] = JUMP_STATS["soundly_solved_jumps"]
 
     # Seek for missing jumps
     MISSING_JUMPS: int = (STATS["Total Jumps"]
@@ -538,7 +573,7 @@ def analyze(contract_address: str, opcodes_dir: str, json_dir: str,
         ENCOUNTERED_ERRORS = True
         if log is not None:
             log.error(f"ADDRESS: {contract_address} - "
-                      f"Number of missing jumps: {MISSING_JUMPS}")
+                        f"Number of missing jumps: {MISSING_JUMPS}")
 
     # Missing jumps are considered unreachable jumps
     JUMP_STATS["unreachable_jumps"] += MISSING_JUMPS
@@ -546,6 +581,9 @@ def analyze(contract_address: str, opcodes_dir: str, json_dir: str,
     # Recalculate not solved jumps
     STATS["Not Solved Jumps"] = (JUMP_STATS["unsolved_jumps"]
                                  + JUMP_STATS["unreachable_jumps"])
+
+    STATS["Unreachable Jumps"] = JUMP_STATS["unreachable_jumps"]
+    STATS["Unsolved Jumps"] = JUMP_STATS["unsolved_jumps"]
 
     # Return stats and contract address
     # (the latter only if encountered errors is True)

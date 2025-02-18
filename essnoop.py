@@ -671,6 +671,32 @@ def main() -> None:
                       "contracts (they are included in the report):",
                       ERRORS)
 
+    # Change labels of the DataFrame
+    STATS_DF.rename(columns={
+        "Solved Jumps": "Solved Jumps (precisely + soundly)",
+        "Not Solved Jumps": "Not Solved Jumps (unreachable + unsolved)",
+    }, inplace=True)
+
+    # Add a label with solved percentage (limit to 2 decimal places)
+    STATS_DF["Solved Jumps (%)"] = (STATS_DF["Solved Jumps (precisely + soundly)"] /
+                                    STATS_DF["Total Jumps"] * 100).round(2)
+    
+    # Reorder columns
+    STATS_DF = STATS_DF[[
+        "Smart Contract",
+        "Total Opcodes",
+        "Total Jumps",
+        "Orphan Jumps",
+        "Solved Jumps (%)",
+        "Solved Jumps (precisely + soundly)",
+        "Precisely Solved Jumps",
+        "Soundly Solved Jumps",
+        "Not Solved Jumps (unreachable + unsolved)",
+        "Unreachable Jumps",
+        "Unsolved Jumps",
+    ]]
+    
+
     # Export the report to a CSV file
     STATS_DF.to_csv(PATHS["report_output_file"], index=False)
 
